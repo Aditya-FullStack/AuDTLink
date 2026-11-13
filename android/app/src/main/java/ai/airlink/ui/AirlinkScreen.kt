@@ -111,15 +111,7 @@ fun AirlinkScreen(vm: LinkViewModel) {
                     containerColor = MaterialTheme.colorScheme.background
                 ),
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Airlink", fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "sound only",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text("AuDTLink v2", fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
                 },
                 actions = {
                     IconButton(onClick = { vm.clear() }) {
@@ -231,35 +223,30 @@ private fun ModeCard(
             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
         )
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    profile.title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurface
-                )
-                if (profile.beta) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "BETA",
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(3.dp))
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                profile.subtitle,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                profile.title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurface
             )
+            if (profile.beta) {
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    "BETA",
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                        .padding(horizontal = 3.dp, vertical = 1.dp)
+                )
+            }
         }
     }
 }
