@@ -11,6 +11,8 @@ jobs:
     name: Build debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -54,3 +56,22 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      # The in-app update check reads /releases/latest, so every push to main
+      # republishes the release for the current versionName.
+      - name: Publish GitHub release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
+          TAG="v${VERSION}"
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          NOTES="AuDTLink ${VERSION}, built from ${GITHUB_SHA:0:7}."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --title "AuDTLink $TAG" --notes "$NOTES" --latest
+          fi
+          gh release view "$TAG" --json tagName,assets --jq '.tagName, (.assets[].name)'
