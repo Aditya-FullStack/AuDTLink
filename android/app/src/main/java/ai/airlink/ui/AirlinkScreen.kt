@@ -1,7 +1,11 @@
 package ai.airlink.ui
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -24,20 +28,29 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -56,15 +69,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import ai.airlink.BuildConfig
 import ai.airlink.ChatItem
 import ai.airlink.Direction
 import ai.airlink.LinkViewModel
+import ai.airlink.Screen
 import ai.airlink.UiState
 import ai.airlink.audio.AudioProfile
 import java.text.SimpleDateFormat
@@ -72,11 +88,22 @@ import java.util.Date
 import java.util.Locale
 
 private val clock = SimpleDateFormat("HH:mm", Locale.getDefault())
+private const val REPO_URL = "https://github.com/Aditya-FullStack/AuDTLink"
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AirlinkScreen(vm: LinkViewModel) {
     val state by vm.state.collectAsState()
+    if (state.screen == Screen.ABOUT) {
+        BackHandler { vm.closeAbout() }
+        AboutScreen(state, vm)
+    } else {
+        ChatScreen(state, vm)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatScreen(state: UiState, vm: LinkViewModel) {
     val context = LocalContext.current
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -111,12 +138,18 @@ fun AirlinkScreen(vm: LinkViewModel) {
                     containerColor = MaterialTheme.colorScheme.background
                 ),
                 title = {
-                    Text("AuDTLink v2", fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+                    Text("AuDTLink v3", fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
                 },
                 actions = {
                     IconButton(onClick = { vm.clear() }) {
                         Icon(
                             Icons.Filled.Delete, "Clear",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = { vm.openAbout() }) {
+                        Icon(
+                            Icons.Filled.Settings, "Settings and about",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -128,6 +161,7 @@ fun AirlinkScreen(vm: LinkViewModel) {
                 draft = draft,
                 onDraft = { draft = it },
                 sending = state.sending,
+                paused = state.paused,
                 receiving = state.receiving,
                 onSend = {
                     if (draft.isNotBlank()) {
@@ -136,7 +170,8 @@ fun AirlinkScreen(vm: LinkViewModel) {
                     }
                 },
                 onAttach = { picker.launch(arrayOf("*/*")) },
-                onToggleReceive = { toggleReceive() }
+                onToggleReceive = { toggleReceive() },
+                onTogglePause = { vm.togglePause() }
             )
         }
     ) { padding ->
@@ -145,27 +180,13 @@ fun AirlinkScreen(vm: LinkViewModel) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                AudioProfile.entries.forEach { p ->
-                    ModeCard(
-                        profile = p,
-                        selected = p == state.profile,
-                        modifier = Modifier.weight(1f),
-                        onClick = { vm.setProfile(p) }
-                    )
-                }
-            }
+            ModeList(state.profile) { vm.setProfile(it) }
 
             Text(
                 state.status,
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp)
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
             )
 
             state.notice?.let { note ->
@@ -205,47 +226,63 @@ fun AirlinkScreen(vm: LinkViewModel) {
 }
 
 @Composable
-private fun ModeCard(
-    profile: AudioProfile,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            if (selected) 2.dp else 1.dp,
-            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-        )
+private fun ModeList(selected: AudioProfile, onSelect: (AudioProfile) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                profile.title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurface
-            )
-            if (profile.beta) {
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    "BETA",
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
-                        .padding(horizontal = 3.dp, vertical = 1.dp)
+        AudioProfile.entries.forEach { p ->
+            val isSelected = p == selected
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onSelect(p) },
+                shape = RoundedCornerShape(12.dp),
+                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surface,
+                border = BorderStroke(
+                    if (isSelected) 2.dp else 1.dp,
+                    if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outline
                 )
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        p.title,
+                        fontSize = 15.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurface
+                    )
+                    if (p.beta) {
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            "BETA",
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                .padding(horizontal = 3.dp, vertical = 1.dp)
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (isSelected) {
+                        Box(
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                }
             }
         }
     }
@@ -260,10 +297,7 @@ private fun EmptyState(state: UiState) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            if (state.profile.audible) "🔊" else "📡",
-            fontSize = 40.sp
-        )
+        Text(if (state.profile.audible) "🔊" else "📡", fontSize = 40.sp)
         Spacer(Modifier.height(14.dp))
         Text(
             "Tap the mic on one phone, then send from the other.",
@@ -273,10 +307,8 @@ private fun EmptyState(state: UiState) {
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            if (state.profile.audible)
-                "Hold them 10–30 cm apart. You will hear the data."
-            else
-                "Ultrasound needs them closer — about 10 cm — and a quiet room.",
+            if (state.profile.audible) "Hold them 10–30 cm apart. You will hear the data."
+            else "Ultrasound needs them closer — about 10 cm — and a quiet room.",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -332,11 +364,28 @@ private fun Composer(
     draft: String,
     onDraft: (String) -> Unit,
     sending: Boolean,
+    paused: Boolean,
     receiving: Boolean,
     onSend: () -> Unit,
     onAttach: () -> Unit,
-    onToggleReceive: () -> Unit
+    onToggleReceive: () -> Unit,
+    onTogglePause: () -> Unit
 ) {
+    val actionIcon = when {
+        sending -> if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause
+        receiving -> Icons.Filled.Stop
+        else -> Icons.Filled.Mic
+    }
+    val actionLabel = when {
+        sending -> if (paused) "Resume transmission" else "Pause transmission"
+        receiving -> "Stop listening"
+        else -> "Listen"
+    }
+    val actionColor = when {
+        receiving -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
             Modifier
@@ -348,18 +397,11 @@ private fun Composer(
                 Modifier
                     .size(50.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (receiving) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.primary
-                    )
-                    .clickable(enabled = !sending) { onToggleReceive() },
+                    .background(actionColor)
+                    .clickable { if (sending) onTogglePause() else onToggleReceive() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    if (receiving) Icons.Filled.Stop else Icons.Filled.Mic,
-                    contentDescription = if (receiving) "Stop listening" else "Listen",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+                Icon(actionIcon, contentDescription = actionLabel, tint = MaterialTheme.colorScheme.onPrimary)
             }
 
             Spacer(Modifier.width(8.dp))
@@ -402,5 +444,171 @@ private fun Composer(
                 )
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------- about
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AboutScreen(state: UiState, vm: LinkViewModel) {
+    val context = LocalContext.current
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                navigationIcon = {
+                    IconButton(onClick = { vm.closeAbout() }) {
+                        Icon(Icons.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                },
+                title = { Text("About", fontWeight = FontWeight.SemiBold, fontSize = 20.sp) }
+            )
+        }
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(Modifier.padding(top = 4.dp, bottom = 4.dp)) {
+                Text("AuDTLink", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "version ${BuildConfig.VERSION_NAME}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            SectionCard("What this is") {
+                Text(
+                    "Two phones, no network. Messages and files travel between " +
+                        "them as sound — frequency-shift keyed tones picked up by " +
+                        "the microphone. No Wi-Fi, no Bluetooth, no pairing, no account.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            SectionCard("Updates") {
+                val upd = state.update
+                Text(
+                    "Installed: ${BuildConfig.VERSION_NAME}",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+
+                when {
+                    state.updateChecking -> Text(
+                        "Checking GitHub…",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    state.updateError != null -> Text(
+                        state.updateError,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+
+                    upd != null && state.updateAvailable -> {
+                        Text(
+                            "Version ${upd.tag} is available",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (upd.notes.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                upd.notes.take(400),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    upd != null -> Text(
+                        "You are on the latest version.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { vm.checkForUpdates() },
+                        enabled = !state.updateChecking
+                    ) {
+                        Text(if (state.updateChecking) "Checking…" else "Check for updates", fontSize = 12.sp)
+                    }
+                    val target = upd?.apkUrl ?: upd?.pageUrl
+                    if (target != null) {
+                        OutlinedButton(onClick = { openUrl(context, target) }) {
+                            Text(
+                                if (upd?.apkUrl != null) "Download" else "Release page",
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            SectionCard("Permissions") {
+                Text(
+                    "Microphone — to hear the other phone.\n" +
+                        "Internet — used only by the update check above. Nothing is " +
+                        "sent, and no message ever leaves the device.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            SectionCard("Source") {
+                Text(
+                    REPO_URL,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { openUrl(context, REPO_URL) }
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun SectionCard(title: String, content: @Composable () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(
+                title,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+            content()
+        }
+    }
+}
+
+private fun openUrl(context: Context, url: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 }
