@@ -21,11 +21,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Protocol self-tests
+      - name: Install minimodem
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends minimodem
+          minimodem --version
+
+      - name: Protocol and interop tests
         run: |
           python3 -m pip install --quiet numpy
           python3 tools/tests/test_airlink.py
           python3 tools/tests/test_kotlin_port.py
+          python3 tools/tests/test_minimodem_interop.py
 
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
