@@ -69,6 +69,30 @@ The status line under the mode cards reports what the receiver is doing, and
 each message shows its frame type, so a silent failure looks different from a
 deaf one.
 
+## Versions and signing
+
+Every build is signed with the same key (`android/keystore/airlink.p12`), so a
+new version installs straight over the old one — no uninstall, no "app not
+installed" error, and messages stay put.
+
+To cut a release, bump two numbers in `android/app/build.gradle.kts` and one
+string in `android/app/src/main/res/values/strings.xml`:
+
+| File | Field | v2 (current) |
+|---|---|---|
+| `app/build.gradle.kts` | `versionCode` | `2` |
+| `app/build.gradle.kts` | `versionName` | `"2.0"` |
+| `res/values/strings.xml` | `app_name` | `AuDTLink v2` |
+
+The launcher label carries the version, which is the quickest way to tell two
+sideloaded builds apart on the same phone.
+
+That keystore is a **sideloading key**: it is committed to the repository and
+its password (`airlink`) is in the build file. That is deliberate — it makes
+builds reproducible for anyone who clones the repo — but it means the key is
+public. Do not publish this app to a store with it, and do not treat an APK
+signed with it as proof of authorship.
+
 ## Companion CLI
 
 ```bash
