@@ -69,8 +69,10 @@ Two modes, nothing else to configure:
 | **Audible fast** | 2400 baud, 2000/4400 Hz | ~240 B/s | Twice as fast. Bell 202's 1 kHz spacing collapses at 2400 baud, so the tones move apart; needs a decent speaker and a quiet room. |
 | **Ultrasound (Beta)** | 18.5/19.5 kHz | ~30 B/s | Silent to most adults. Keep phones ~10 cm apart. |
 
-Sending can be paused mid-transfer with the round button in the composer, which
-turns into pause/play while a transmission is running.
+Sending can be paused with the round button in the composer, which turns into
+pause/play while a transmission is running. Pausing takes effect within about
+40 ms — the frame being sent is abandoned and re-sent from the top when you
+resume, because half a frame is no use to the receiver.
 
 The gear icon opens **About**: version, what the app does, its permissions, and
 an update check that reads the newest GitHub release and offers the APK. That
@@ -102,9 +104,9 @@ It rewrites the three places that have to stay in sync:
 
 | File | Field | v2 (current) |
 |---|---|---|
-| `app/build.gradle.kts` | `versionCode` | `4` |
-| `app/build.gradle.kts` | `versionName` | `"4.0"` |
-| `res/values/strings.xml` | `app_name` | `AuDTLink v4` |
+| `app/build.gradle.kts` | `versionCode` | `5` |
+| `app/build.gradle.kts` | `versionName` | `"4.1"` |
+| `res/values/strings.xml` | `app_name` | `AuDTLink v4.1` |
 
 The launcher label carries the version, which is the quickest way to tell two
 sideloaded builds apart on the same phone.
