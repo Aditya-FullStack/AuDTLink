@@ -73,7 +73,7 @@ def main() -> int:
     print("minimodem:", (ver.stdout or ver.stderr).decode("utf-8", "replace").strip().splitlines()[0])
 
     failed = 0
-    for key in ("bell202", "bell103", "ultrasonic"):
+    for key in ("bell202", "fast", "bell103", "ultrasonic"):
         try:
             check(key)
             print("ok    %-11s both directions, %d bytes each way" % (key, len(PAYLOAD)))
