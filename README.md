@@ -92,6 +92,13 @@ The status line under the mode cards reports what the receiver is doing, and
 each message shows its frame type, so a silent failure looks different from a
 deaf one.
 
+## Build types
+
+CI builds the **release** variant: R8 minification, resource shrinking, and the
+shared signing key — the APK that gets published to GitHub Releases is the one
+you install. `./gradlew assembleDebug` still works locally when you want a
+debuggable build with no shrinking.
+
 ## Versions and signing
 
 Every build is signed with the same key (`android/keystore/airlink.p12`), so a
@@ -109,9 +116,9 @@ It rewrites the three places that have to stay in sync:
 
 | File | Field | v2 (current) |
 |---|---|---|
-| `app/build.gradle.kts` | `versionCode` | `6` |
-| `app/build.gradle.kts` | `versionName` | `"4.2"` |
-| `res/values/strings.xml` | `app_name` | `AuDTLink v4.2` |
+| `app/build.gradle.kts` | `versionCode` | `7` |
+| `app/build.gradle.kts` | `versionName` | `"4.3"` |
+| `res/values/strings.xml` | `app_name` | `AuDTLink v4.3` |
 
 The launcher label carries the version, which is the quickest way to tell two
 sideloaded builds apart on the same phone.
