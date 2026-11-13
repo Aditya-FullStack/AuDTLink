@@ -2,10 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      No INTERNET, no BLUETOOTH, no ACCESS_NETWORK_STATE, no ACCESS_FINE_LOCATION.
-      Airlink cannot reach the network even in principle: the only thing it does
-      with the outside world is push samples at the speaker and read the mic.
+      No BLUETOOTH, no ACCESS_NETWORK_STATE, no ACCESS_FINE_LOCATION. Nothing is
+      transmitted anywhere: the app pushes samples at the speaker and reads the
+      microphone. INTERNET exists only for the update check on the About screen.
     -->
+    <!--
+      INTERNET is used by exactly one thing: the "Check for updates" button on
+      the About screen, which reads the public GitHub release JSON. Messages
+      never leave the device — that is the whole point of the app.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
