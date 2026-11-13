@@ -46,7 +46,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,6 +59,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -84,6 +87,7 @@ import ai.airlink.BuildConfig
 import ai.airlink.ChatItem
 import ai.airlink.Direction
 import ai.airlink.LinkViewModel
+import ai.airlink.ReleaseInfo
 import ai.airlink.Screen
 import ai.airlink.UiState
 import ai.airlink.audio.AudioProfile
@@ -101,6 +105,19 @@ private val APP_TITLE: String =
 @Composable
 fun AirlinkScreen(vm: LinkViewModel) {
     val state by vm.state.collectAsState()
+    val context = LocalContext.current
+
+    state.updatePrompt?.let { release ->
+        UpdateDialog(
+            release = release,
+            onDownload = {
+                openUrl(context, release.apkUrl ?: release.pageUrl)
+                vm.dismissUpdatePrompt()
+            },
+            onLater = { vm.dismissUpdatePrompt() }
+        )
+    }
+
     if (state.screen == Screen.ABOUT) {
         BackHandler { vm.closeAbout() }
         AboutScreen(state, vm)
@@ -676,6 +693,37 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
             content()
         }
     }
+}
+
+@Composable
+private fun UpdateDialog(release: ReleaseInfo, onDownload: () -> Unit, onLater: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onLater,
+        title = { Text("Update available", fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column {
+                Text(
+                    "Version ${release.tag} is out. You have ${BuildConfig.VERSION_NAME}.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (release.notes.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        release.notes.take(320),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDownload) { Text("Download") }
+        },
+        dismissButton = {
+            TextButton(onClick = onLater) { Text("Later") }
+        }
+    )
 }
 
 private fun openUrl(context: Context, url: String) {
