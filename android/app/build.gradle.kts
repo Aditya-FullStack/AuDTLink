@@ -22,7 +22,7 @@ android {
     // password is public on purpose. Never use it for anything you publish.
     signingConfigs {
         create("shared") {
-            storeFile = file("keystore/airlink.p12")
+            storeFile = rootProject.file("keystore/airlink.p12")
             storeType = "PKCS12"
             storePassword = "airlink"
             keyAlias = "airlink"
