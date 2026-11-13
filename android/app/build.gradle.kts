@@ -13,8 +13,8 @@ android {
         minSdk = 24
         targetSdk = 34
         // Bump these together for every release: the label carries the version.
-        versionCode = 6
-        versionName = "4.2"
+        versionCode = 7
+        versionName = "4.3"
     }
 
     // One committed key for every build, so v2 installs straight over v1.
@@ -35,7 +35,9 @@ android {
             signingConfig = signingConfigs.getByName("shared")
         }
         release {
-            isMinifyEnabled = false
+            // R8 + resource shrinking: this is the build that gets handed out.
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("shared")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
