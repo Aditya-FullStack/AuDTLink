@@ -78,6 +78,11 @@ The gear icon opens **About**: version, what the app does, its permissions, and
 an update check that reads the newest GitHub release and offers the APK. That
 check is the only network call the app makes — see the note on `INTERNET` below.
 
+The app checks for a newer release **once every 24 hours, on open** (the
+timestamp is stored, so relaunching does not re-check). If one exists it shows a
+dialog with the version and release notes, and a Download button. A failed
+background check stays silent; only the manual button reports errors.
+
 It also carries a **"Use it from a computer"** section: the exact `minimodem`
 receive and transmit commands for whichever mode is selected, with the mark and
 space frequencies, plus copy buttons. No desktop app to install — a Linux,
@@ -104,9 +109,9 @@ It rewrites the three places that have to stay in sync:
 
 | File | Field | v2 (current) |
 |---|---|---|
-| `app/build.gradle.kts` | `versionCode` | `5` |
-| `app/build.gradle.kts` | `versionName` | `"4.1"` |
-| `res/values/strings.xml` | `app_name` | `AuDTLink v4.1` |
+| `app/build.gradle.kts` | `versionCode` | `6` |
+| `app/build.gradle.kts` | `versionName` | `"4.2"` |
+| `res/values/strings.xml` | `app_name` | `AuDTLink v4.2` |
 
 The launcher label carries the version, which is the quickest way to tell two
 sideloaded builds apart on the same phone.
