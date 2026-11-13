@@ -73,7 +73,9 @@ def test_band_limited_channel():
     for key, p in PROFILES.items():
         m = BfskModem(p)
         sig = m.modulate(payload)
-        lo, hi = (300, 3400) if p.audible else (17500, 21000)
+        # a phone speaker/mic chain: ~300 Hz to ~7 kHz, which the 2400 baud
+        # profile needs because its space tone sits at 4.4 kHz.
+        lo, hi = (300, 7000) if p.audible else (17500, 21000)
         assert m.demodulate(add_noise(bandpass(sig, m.fs, lo, hi), 10.0)) == payload, key
 
 
