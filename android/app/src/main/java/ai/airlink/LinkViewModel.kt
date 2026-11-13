@@ -9,24 +9,28 @@ import ai.airlink.audio.AudioEngine
 import ai.airlink.audio.AudioProfile
 import ai.airlink.audio.BfskDemodulator
 import ai.airlink.audio.BfskModulator
+import ai.airlink.protocol.FileAssembler
 import ai.airlink.protocol.Frame
 import ai.airlink.protocol.FrameAssembler
 import ai.airlink.protocol.FrameCodec
 import ai.airlink.protocol.FrameType
-import ai.airlink.protocol.FileAssembler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
 
 enum class Direction { IN, OUT }
+
+enum class Screen { CHAT, ABOUT }
 
 data class ChatItem(
     val id: Long,
@@ -43,12 +47,18 @@ data class UiState(
     val status: String = "Ready",
     val sending: Boolean = false,
     val receiving: Boolean = false,
+    val paused: Boolean = false,
     val signal: Float = 0f,
     val framesOk: Int = 0,
     val framesBad: Int = 0,
     val bytes: Int = 0,
     val sampleRate: Int = 48000,
-    val notice: String? = null
+    val notice: String? = null,
+    val screen: Screen = Screen.CHAT,
+    val updateChecking: Boolean = false,
+    val update: ReleaseInfo? = null,
+    val updateAvailable: Boolean = false,
+    val updateError: String? = null
 )
 
 class LinkViewModel(app: Application) : AndroidViewModel(app) {
@@ -66,6 +76,9 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
 
     private val itemIds = AtomicLong(1)
     private var txCounter = 1
+
+    @Volatile
+    private var pauseRequested = false
 
     init {
         files.onSaved = { saved ->
@@ -95,6 +108,50 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
         it.copy(notice = "Microphone permission is required to receive.")
     }
 
+    fun openAbout() = _state.update { it.copy(screen = Screen.ABOUT) }
+
+    fun closeAbout() = _state.update { it.copy(screen = Screen.CHAT) }
+
+    // ---------------------------------------------------------------- pause
+
+    fun togglePause() {
+        if (!_state.value.sending) return
+        pauseRequested = !pauseRequested
+        _state.update {
+            it.copy(paused = pauseRequested, status = if (pauseRequested) "Paused" else "Resuming…")
+        }
+    }
+
+    // --------------------------------------------------------------- update
+
+    fun checkForUpdates() {
+        if (_state.value.updateChecking) return
+        _state.update { it.copy(updateChecking = true, updateError = null, update = null) }
+        viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) { UpdateChecker.fetchLatest() }
+            }
+            result.onSuccess { release ->
+                val available = UpdateChecker.isNewer(release.tag, BuildConfig.VERSION_NAME)
+                _state.update {
+                    it.copy(
+                        updateChecking = false,
+                        update = release,
+                        updateAvailable = available,
+                        updateError = null
+                    )
+                }
+            }.onFailure { e ->
+                _state.update {
+                    it.copy(
+                        updateChecking = false,
+                        updateError = e.message ?: "Could not reach GitHub"
+                    )
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------ transmit
 
     fun sendText(text: String) {
@@ -118,8 +175,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     fun sendFile(uri: Uri) {
         if (_state.value.sending) return
         viewModelScope.launch(Dispatchers.IO) {
-            val app = getApplication<Application>()
-            val resolver = app.contentResolver
+            val resolver = getApplication<Application>().contentResolver
             val name = displayName(uri)
             val bytes = runCatching {
                 resolver.openInputStream(uri)?.use { it.readBytes() }
@@ -138,7 +194,8 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
             addItem(
                 ChatItem(
                     itemIds.getAndIncrement(), Direction.OUT, "FILE", name,
-                    "%d bytes · %d chunks · about %s on the air".format(bytes.size, frames.size, human(seconds))
+                    "%d bytes · %d chunks · about %s on the air"
+                        .format(bytes.size, frames.size, human(seconds))
                 )
             )
             transmit(frames, "file")
@@ -179,17 +236,35 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     private fun transmit(payloads: List<ByteArray>, label: String) {
         stopReceiving()
         sendJob?.cancel()
+        pauseRequested = false
+        _state.update { it.copy(paused = false) }
+
         sendJob = viewModelScope.launch(Dispatchers.IO) {
             val profile = _state.value.profile
             val rate = engine.pickSampleRate(48000)
-            _state.update { it.copy(sending = true, status = "Transmitting $label…", sampleRate = rate) }
+            _state.update {
+                it.copy(sending = true, status = "Transmitting $label…", sampleRate = rate)
+            }
             try {
                 engine.withTrack(rate) { track ->
                     val mod = BfskModulator(profile, rate)
                     val lead = mod.idle(150)
                     track.write(lead, 0, lead.size)
+
                     for (index in payloads.indices) {
                         if (!isActive) break
+
+                        if (pauseRequested) {
+                            _state.update {
+                                it.copy(status = "Paused at ${index + 1}/${payloads.size}")
+                            }
+                            while (pauseRequested && isActive) delay(60)
+                            if (!isActive) break
+                            _state.update {
+                                it.copy(status = "Transmitting $label ${index + 1}/${payloads.size}…")
+                            }
+                        }
+
                         val pcm = mod.render(payloads[index])
                         var written = 0
                         while (written < pcm.size) {
@@ -201,13 +276,19 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
                             it.copy(status = "Transmitting $label ${index + 1}/${payloads.size}…")
                         }
                     }
+
                     val tail = mod.idle(120)
                     track.write(tail, 0, tail.size)
                 }
-                _state.update { it.copy(sending = false, status = "Sent $label") }
+                _state.update { it.copy(sending = false, paused = false, status = "Sent $label") }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(sending = false, status = "Transmit failed", notice = e.message ?: "audio error")
+                    it.copy(
+                        sending = false,
+                        paused = false,
+                        status = "Transmit failed",
+                        notice = e.message ?: "audio error"
+                    )
                 }
             }
         }
@@ -218,7 +299,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     fun startReceiving() {
         if (_state.value.receiving) return
         sendJob?.cancel()
-        _state.update { it.copy(sending = false) }
+        _state.update { it.copy(sending = false, paused = false) }
 
         val profile = _state.value.profile
         val rate = engine.pickSampleRate(48000)
@@ -272,8 +353,8 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
             FrameType.HELLO ->
                 addItem(ChatItem(itemIds.getAndIncrement(), Direction.IN, "HELLO", frame.text()))
             FrameType.FILE_META -> {
-                val len = java.nio.ByteBuffer.wrap(frame.payload).order(java.nio.ByteOrder.LITTLE_ENDIAN)
-                    .getInt(4)
+                val len = java.nio.ByteBuffer.wrap(frame.payload)
+                    .order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt(4)
                 _state.update { it.copy(status = "Receiving file · $len bytes") }
             }
             FrameType.ACK ->
@@ -286,7 +367,9 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
 
     // --------------------------------------------------------------- misc
 
-    fun clear() = _state.update { it.copy(items = emptyList(), framesOk = 0, framesBad = 0, bytes = 0) }
+    fun clear() = _state.update {
+        it.copy(items = emptyList(), framesOk = 0, framesBad = 0, bytes = 0)
+    }
 
     private fun addItem(item: ChatItem) = _state.update { it.copy(items = it.items + item) }
 
