@@ -33,10 +33,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
@@ -68,7 +70,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -89,6 +93,10 @@ import java.util.Locale
 
 private val clock = SimpleDateFormat("HH:mm", Locale.getDefault())
 private const val REPO_URL = "https://github.com/Aditya-FullStack/AuDTLink"
+
+/** "AuDTLink v4" for 4.0, "AuDTLink v4.1" for 4.1 — same rule as tools/bump_version.py. */
+private val APP_TITLE: String =
+    "AuDTLink v" + BuildConfig.VERSION_NAME.removeSuffix(".0")
 
 @Composable
 fun AirlinkScreen(vm: LinkViewModel) {
@@ -138,7 +146,7 @@ private fun ChatScreen(state: UiState, vm: LinkViewModel) {
                     containerColor = MaterialTheme.colorScheme.background
                 ),
                 title = {
-                    Text("AuDTLink v3", fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+                    Text(APP_TITLE, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
                 },
                 actions = {
                     IconButton(onClick = { vm.clear() }) {
@@ -563,6 +571,35 @@ private fun AboutScreen(state: UiState, vm: LinkViewModel) {
                 }
             }
 
+            SectionCard("Use it from a computer") {
+                val p = state.profile
+                Text(
+                    "No desktop app needed. Airlink frames are plain 8N1 FSK, so " +
+                        "minimodem decodes them as-is on Linux, macOS, BSD or WSL.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    p.wireSummary(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(10.dp))
+                CommandRow("Receive (phone \u2192 computer)", p.minimodemRxCommand())
+                Spacer(Modifier.height(8.dp))
+                CommandRow("Transmit (computer \u2192 phone)", p.minimodemTxCommand())
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Frames are binary, so write them to a file and let the repo's " +
+                        "tools/airlink_cli.py decode turn them into messages and files. " +
+                        "Switch mode on the main screen to see another frequency pair.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             SectionCard("Permissions") {
                 Text(
                     "Microphone — to hear the other phone.\n" +
@@ -584,6 +621,40 @@ private fun AboutScreen(state: UiState, vm: LinkViewModel) {
             }
 
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun CommandRow(label: String, command: String) {
+    val clipboard = LocalClipboardManager.current
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(2.dp))
+            SelectionContainer {
+                Text(
+                    command,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+        IconButton(onClick = { clipboard.setText(AnnotatedString(command)) }) {
+            Icon(
+                Icons.Filled.ContentCopy,
+                contentDescription = "Copy command",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
         }
     }
 }
