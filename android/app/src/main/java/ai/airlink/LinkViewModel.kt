@@ -1,6 +1,7 @@
 package ai.airlink
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
@@ -58,7 +59,8 @@ data class UiState(
     val updateChecking: Boolean = false,
     val update: ReleaseInfo? = null,
     val updateAvailable: Boolean = false,
-    val updateError: String? = null
+    val updateError: String? = null,
+    val updatePrompt: ReleaseInfo? = null
 )
 
 class LinkViewModel(app: Application) : AndroidViewModel(app) {
@@ -77,10 +79,14 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         /** ~43 ms of audio at 48 kHz — the pause granularity. */
         const val BLOCK_SAMPLES = 2048
+        const val KEY_LAST_CHECK = "last_update_check"
+        const val DAY_MS = 24L * 60L * 60L * 1000L
     }
 
     private val itemIds = AtomicLong(1)
     private var txCounter = 1
+
+    private val prefs = app.getSharedPreferences("airlink", Context.MODE_PRIVATE)
 
     @Volatile
     private var pauseRequested = false
@@ -95,6 +101,18 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         files.onFailed = { msg -> addItem(ChatItem(itemIds.getAndIncrement(), Direction.IN, "ERROR", msg)) }
+        maybeDailyUpdateCheck()
+    }
+
+    /**
+     * Runs at most once per 24 h, on app open, without touching the UI beyond
+     * the dialog. The timestamp lives in SharedPreferences so killing the app
+     * does not reset the clock.
+     */
+    private fun maybeDailyUpdateCheck() {
+        val last = prefs.getLong(KEY_LAST_CHECK, 0L)
+        if (System.currentTimeMillis() - last < DAY_MS) return
+        launchUpdateCheck(interactive = false)
     }
 
     // ------------------------------------------------------------- settings
@@ -129,28 +147,42 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
 
     // --------------------------------------------------------------- update
 
-    fun checkForUpdates() {
+    /** The button on the About screen: shows progress and errors. */
+    fun checkForUpdates() = launchUpdateCheck(interactive = true)
+
+    fun dismissUpdatePrompt() = _state.update { it.copy(updatePrompt = null) }
+
+    private fun launchUpdateCheck(interactive: Boolean) {
         if (_state.value.updateChecking) return
-        _state.update { it.copy(updateChecking = true, updateError = null, update = null) }
+        if (interactive) {
+            _state.update { it.copy(updateChecking = true, updateError = null, update = null) }
+        }
         viewModelScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) { UpdateChecker.fetchLatest() }
             }
             result.onSuccess { release ->
                 val available = UpdateChecker.isNewer(release.tag, BuildConfig.VERSION_NAME)
+                prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
                 _state.update {
                     it.copy(
                         updateChecking = false,
                         update = release,
                         updateAvailable = available,
-                        updateError = null
+                        updateError = null,
+                        updatePrompt = if (available) release else null
                     )
                 }
             }.onFailure { e ->
                 _state.update {
                     it.copy(
                         updateChecking = false,
-                        updateError = e.message ?: "Could not reach GitHub"
+                        // a background check stays quiet; only the button reports
+                        updateError = if (interactive) {
+                            e.message ?: "Could not reach GitHub"
+                        } else {
+                            it.updateError
+                        }
                     )
                 }
             }
