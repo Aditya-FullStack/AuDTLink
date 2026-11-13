@@ -12,13 +12,31 @@ android {
         applicationId = "ai.airlink"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        // Bump these together for every release: the label carries the version.
+        versionCode = 2
+        versionName = "2.0"
+    }
+
+    // One committed key for every build, so v2 installs straight over v1.
+    // It is a sideloading key, not a Play key — it lives in the repo and its
+    // password is public on purpose. Never use it for anything you publish.
+    signingConfigs {
+        create("shared") {
+            storeFile = file("keystore/airlink.p12")
+            storeType = "PKCS12"
+            storePassword = "airlink"
+            keyAlias = "airlink"
+            keyPassword = "airlink"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shared")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
