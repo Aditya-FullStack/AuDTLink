@@ -53,14 +53,21 @@ cannot phone home even in principle.
 
 ### Using it
 
-1. Pick the same profile on both phones (Audible / Audible slow / Ultrasonic).
+1. Pick the same mode on both phones — **Audible** or **Ultrasound (Beta)**.
 2. On the receiving phone tap the **mic**; on the sending phone type and tap
    **send**, or attach a file.
 3. Hold them 10–30 cm apart, speaker to microphone, roughly facing.
 
-The status strip shows frames accepted, frames rejected, bytes decoded and a
-five-bar signal meter, so you can see whether the channel is working before
-you blame the app.
+Two modes, nothing else to configure:
+
+| Mode | Tone | Speed | Notes |
+|---|---|---|---|
+| **Audible** | Bell 202, 1200/2200 Hz | ~120 B/s | You hear the data. Works at a few metres. |
+| **Ultrasound (Beta)** | 18.5/19.5 kHz | ~30 B/s | Silent to most adults. Keep phones ~10 cm apart. |
+
+The status line under the mode cards reports what the receiver is doing, and
+each message shows its frame type, so a silent failure looks different from a
+deaf one.
 
 ## Companion CLI
 
@@ -126,9 +133,17 @@ side; `listen` reads WAVs at whatever rate they were recorded.
 ## Testing
 
 ```bash
-python3 tools/tests/test_airlink.py       # protocol + modem, all profiles
-python3 tools/tests/test_kotlin_port.py   # the Android DSP, transliterated
+python3 tools/tests/test_airlink.py            # protocol + modem, all profiles
+python3 tools/tests/test_kotlin_port.py        # the Android DSP, transliterated
+python3 tools/tests/test_minimodem_interop.py  # real minimodem, both directions
 ```
+
+The interop test is the one that settles "does minimodem actually hear this?".
+It writes a WAV with our modulator, hands it to `minimodem --rx`, and requires
+the exact bytes back; then it has `minimodem --tx` produce a WAV and requires
+our demodulator to read it. Both directions, all three profiles. It skips with
+exit 0 when minimodem is absent, and CI installs minimodem and runs it on every
+push, so the compatibility claim is checked rather than asserted.
 
 The first suite covers CRC vectors, frame round-trips, byte-at-a-time
 streaming, resync after garbage, corruption rejection, modulation and
