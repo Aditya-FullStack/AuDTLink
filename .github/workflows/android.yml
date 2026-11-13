@@ -41,19 +41,27 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Assemble debug APK
+      - name: Assemble release APK
         working-directory: android
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
 
       - name: Report artifact
         if: always()
-        run: ls -lh android/app/build/outputs/apk/debug/ || true
+        run: ls -lh android/app/build/outputs/apk/release/ || true
+
+      - name: Name the APK
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/AuDTLink-${VERSION}.apk"
+          ls -lh dist/
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: airlink-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: airlink-release-apk
+          path: dist/*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -67,11 +75,11 @@ jobs:
           set -euo pipefail
           VERSION=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
           TAG="v${VERSION}"
-          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          APK="dist/AuDTLink-${VERSION}.apk"
           NOTES="AuDTLink ${VERSION}, built from ${GITHUB_SHA:0:7}."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" --title "AuDTLink $TAG" --notes "$NOTES" --latest
           fi
-          gh release view "$TAG" --json tagName,assets --jq '.tagName, (.assets[].name)'
+          gh release view "$TAG" --json tagName,assets --jq '.tagName, (.assets[] | "\(.name) \(.size)")'
