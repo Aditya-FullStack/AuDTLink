@@ -43,8 +43,12 @@ class AudioEngine {
         return 44100
     }
 
-    /** Runs [block] with an open, already-playing AudioTrack. */
-    fun <T> withTrack(rate: Int, block: (AudioTrack) -> T): T {
+    /**
+     * Runs [block] with an open, already-playing AudioTrack. The block is a
+     * suspend lambda so the caller can pause mid-stream without blocking the
+     * thread it is writing from.
+     */
+    suspend fun <T> withTrack(rate: Int, block: suspend (AudioTrack) -> T): T {
         val minBuf = AudioTrack.getMinBufferSize(
             rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
