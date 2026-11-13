@@ -74,6 +74,11 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    private companion object {
+        /** ~43 ms of audio at 48 kHz — the pause granularity. */
+        const val BLOCK_SAMPLES = 2048
+    }
+
     private val itemIds = AtomicLong(1)
     private var txCounter = 1
 
@@ -254,24 +259,39 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
                     for (index in payloads.indices) {
                         if (!isActive) break
 
-                        if (pauseRequested) {
-                            _state.update {
-                                it.copy(status = "Paused at ${index + 1}/${payloads.size}")
-                            }
-                            while (pauseRequested && isActive) delay(60)
-                            if (!isActive) break
-                            _state.update {
-                                it.copy(status = "Transmitting $label ${index + 1}/${payloads.size}…")
-                            }
-                        }
-
                         val pcm = mod.render(payloads[index])
                         var written = 0
+                        var announced = false
+
+                        // Write in small blocks so a pause is felt within ~40 ms
+                        // instead of at the end of the frame. A single text
+                        // message is one frame, so a between-frames check would
+                        // never fire in time to be useful.
                         while (written < pcm.size) {
-                            val n = track.write(pcm, written, pcm.size - written)
+                            if (pauseRequested) {
+                                if (!announced) {
+                                    _state.update {
+                                        it.copy(status = "Paused at ${index + 1}/${payloads.size}")
+                                    }
+                                    announced = true
+                                }
+                                while (pauseRequested && isActive) delay(40)
+                                if (!isActive) break
+                                // Re-send this frame from the top: half a frame
+                                // is useless to the receiver, so resuming
+                                // rewinds rather than continues.
+                                written = 0
+                                announced = false
+                                _state.update {
+                                    it.copy(status = "Transmitting $label ${index + 1}/${payloads.size}…")
+                                }
+                            }
+                            val n = track.write(pcm, written, minOf(BLOCK_SAMPLES, pcm.size - written))
                             if (n <= 0) break
                             written += n
                         }
+
+                        if (!isActive) break
                         _state.update {
                             it.copy(status = "Transmitting $label ${index + 1}/${payloads.size}…")
                         }
