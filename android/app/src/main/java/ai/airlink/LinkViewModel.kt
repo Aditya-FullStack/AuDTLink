@@ -40,7 +40,7 @@ data class ChatItem(
 data class UiState(
     val profile: AudioProfile = AudioProfile.AUDIBLE,
     val items: List<ChatItem> = emptyList(),
-    val status: String = "Idle — nothing on the air",
+    val status: String = "Ready",
     val sending: Boolean = false,
     val receiving: Boolean = false,
     val signal: Float = 0f,
@@ -85,7 +85,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
         if (profile == _state.value.profile) return
         val wasReceiving = _state.value.receiving
         stopReceiving()
-        _state.update { it.copy(profile = profile, status = "Profile: ${profile.subtitle}") }
+        _state.update { it.copy(profile = profile, status = "Ready") }
         if (wasReceiving) startReceiving()
     }
 
@@ -252,7 +252,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         _state.update {
-            it.copy(receiving = true, status = "Listening on ${profile.title} · ${rate / 1000} kHz")
+            it.copy(receiving = true, status = "Listening — ${profile.title}")
         }
     }
 
@@ -260,7 +260,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
         if (!_state.value.receiving) return
         engine.stopCapture()
         demod = null
-        _state.update { it.copy(receiving = false, signal = 0f, status = "Idle — nothing on the air") }
+        _state.update { it.copy(receiving = false, signal = 0f, status = "Ready") }
     }
 
     private fun handle(frame: Frame) {
