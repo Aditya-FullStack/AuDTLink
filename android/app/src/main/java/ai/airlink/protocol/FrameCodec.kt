@@ -22,7 +22,7 @@ object FrameCodec {
         val body = ByteBuffer.allocate(10).order(ByteOrder.LITTLE_ENDIAN).apply {
             put(MAGIC_0)
             put(MAGIC_1)
-            put(VERSION)
+            put(VERSION.toByte())
             put(frame.type.toByte())
             putShort(frame.seq.toShort())
             putShort(frame.payload.size.toShort())
