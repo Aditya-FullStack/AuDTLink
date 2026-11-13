@@ -38,7 +38,7 @@ data class ChatItem(
 )
 
 data class UiState(
-    val profile: AudioProfile = AudioProfile.BELL202,
+    val profile: AudioProfile = AudioProfile.AUDIBLE,
     val items: List<ChatItem> = emptyList(),
     val status: String = "Idle — nothing on the air",
     val sending: Boolean = false,
