@@ -86,8 +86,14 @@ Every build is signed with the same key (`android/keystore/airlink.p12`), so a
 new version installs straight over the old one — no uninstall, no "app not
 installed" error, and messages stay put.
 
-To cut a release, bump two numbers in `android/app/build.gradle.kts` and one
-string in `android/app/src/main/res/values/strings.xml`:
+To cut a release, run one command:
+
+```bash
+python3 tools/bump_version.py 4.1     # -> versionCode 4, versionName 4.1, label "AuDTLink v4.1"
+git commit -am "v4.1" && git push
+```
+
+It rewrites the three places that have to stay in sync:
 
 | File | Field | v2 (current) |
 |---|---|---|
