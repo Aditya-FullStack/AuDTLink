@@ -70,7 +70,18 @@ enum class AudioProfile(
     /** 8 data bits + start + stop, so 10 bits on the wire per byte. */
     val bytesPerSecond: Double get() = baud / 10.0
 
+    /** Transmit needs no receive filter, so the -b tail is dropped. */
+    val minimodemTxArgs: List<String> get() = minimodemRxArgs.take(5)
+
     fun minimodemRxCommand(): String = "minimodem --rx -q " + minimodemRxArgs.joinToString(" ")
+
+    fun minimodemTxCommand(): String = "minimodem --tx -q " + minimodemTxArgs.joinToString(" ")
+
+    /** One-line summary of what a decoder on the other end must be told. */
+    fun wireSummary(): String =
+        "%s · %.0f baud · mark %.0f Hz · space %.0f Hz · 8N1".format(
+            title, baud, markHz, spaceHz
+        )
 
     companion object {
         fun fromId(id: String?): AudioProfile = entries.firstOrNull { it.id == id } ?: AUDIBLE
