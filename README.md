@@ -47,9 +47,12 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 minSdk 24, targetSdk 34, Kotlin 2.0.21, AGP 8.5.2, Compose BOM 2024.09.03.
 
-The manifest requests exactly two permissions — `RECORD_AUDIO` and
-`MODIFY_AUDIO_SETTINGS`. There is no `INTERNET` permission, so the app
-cannot phone home even in principle.
+The manifest requests `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS` and `INTERNET`.
+`INTERNET` was added for one feature only — the update check on the About
+screen, which GETs the public release JSON from GitHub. No message, file or
+usage data is ever sent anywhere; if you want the absolute guarantee back,
+delete that permission and the update check will fail with a clear error while
+everything else keeps working.
 
 ### Using it
 
@@ -62,8 +65,16 @@ Two modes, nothing else to configure:
 
 | Mode | Tone | Speed | Notes |
 |---|---|---|---|
-| **Audible** | Bell 202, 1200/2200 Hz | ~120 B/s | You hear the data. Works at a few metres. |
+| **Audible** | Bell 202, 1200/2200 Hz | ~120 B/s | The tolerant default. Works at a few metres. |
+| **Audible fast** | 2400 baud, 2000/4400 Hz | ~240 B/s | Twice as fast. Bell 202's 1 kHz spacing collapses at 2400 baud, so the tones move apart; needs a decent speaker and a quiet room. |
 | **Ultrasound (Beta)** | 18.5/19.5 kHz | ~30 B/s | Silent to most adults. Keep phones ~10 cm apart. |
+
+Sending can be paused mid-transfer with the round button in the composer, which
+turns into pause/play while a transmission is running.
+
+The gear icon opens **About**: version, what the app does, its permissions, and
+an update check that reads the newest GitHub release and offers the APK. That
+check is the only network call the app makes — see the note on `INTERNET` below.
 
 The status line under the mode cards reports what the receiver is doing, and
 each message shows its frame type, so a silent failure looks different from a
@@ -80,9 +91,9 @@ string in `android/app/src/main/res/values/strings.xml`:
 
 | File | Field | v2 (current) |
 |---|---|---|
-| `app/build.gradle.kts` | `versionCode` | `2` |
-| `app/build.gradle.kts` | `versionName` | `"2.0"` |
-| `res/values/strings.xml` | `app_name` | `AuDTLink v2` |
+| `app/build.gradle.kts` | `versionCode` | `3` |
+| `app/build.gradle.kts` | `versionName` | `"3.0"` |
+| `res/values/strings.xml` | `app_name` | `AuDTLink v3` |
 
 The launcher label carries the version, which is the quickest way to tell two
 sideloaded builds apart on the same phone.
