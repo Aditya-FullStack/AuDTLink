@@ -54,6 +54,9 @@ class Profile:
 # the band instead of 1.1 kHz below Nyquist.
 PROFILES = {
     "bell202": Profile("bell202", "Audible — Bell 202 1200 baud", 1200, 1200, 2200, 48000, True, 512),
+    # 2400 baud needs a wider tone spacing than Bell 202: at 2400 baud the two
+    # tones must be at least ~1/T apart, and 1200/2200 collapses at 12 dB SNR.
+    "fast": Profile("fast", "Audible fast — 2400 baud", 2400, 2000, 4400, 48000, True, 512, ("-b", "3400")),
     "bell103": Profile("bell103", "Audible — Bell 103 300 baud", 300, 1270, 1070, 48000, True, 128),
     "ultrasonic": Profile("ultrasonic", "Ultrasonic — 18.5/19.5 kHz 300 baud", 300,
                           18500, 19500, 48000, False, 96, ("-b", "1400")),
