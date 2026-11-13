@@ -13,8 +13,8 @@ android {
         minSdk = 24
         targetSdk = 34
         // Bump these together for every release: the label carries the version.
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "3.0"
     }
 
     // One committed key for every build, so v2 installs straight over v1.
@@ -50,6 +50,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
