@@ -65,7 +65,8 @@ data class UiState(
     val updateAvailable: Boolean = false,
     val updateError: String? = null,
     val updatePrompt: ReleaseInfo? = null,
-    val darkTheme: Boolean = false
+    val darkTheme: Boolean = false,
+    val bestEffort: Boolean = false
 )
 
 class LinkViewModel(app: Application) : AndroidViewModel(app) {
@@ -82,7 +83,10 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("airlink", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(
-        UiState(darkTheme = prefs.getBoolean(KEY_DARK_THEME, false))
+        UiState(
+            darkTheme = prefs.getBoolean(KEY_DARK_THEME, false),
+            bestEffort = prefs.getBoolean(KEY_BEST_EFFORT, false)
+        )
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -91,6 +95,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
         const val BLOCK_SAMPLES = 2048
         const val KEY_LAST_CHECK = "last_update_check"
         const val KEY_DARK_THEME = "dark_theme"
+        const val KEY_BEST_EFFORT = "best_effort"
         const val DAY_MS = 24L * 60L * 60L * 1000L
     }
 
@@ -101,6 +106,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     private var pauseRequested = false
 
     init {
+        files.bestEffort = prefs.getBoolean(KEY_BEST_EFFORT, false)
         files.onSaved = { saved ->
             addItem(
                 ChatItem(
@@ -108,7 +114,9 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
                     direction = Direction.IN,
                     kind = "FILE",
                     text = saved.name,
-                    detail = "${saved.bytes} bytes · verified · tap to open",
+                    detail = if (saved.partial)
+                        "partial · ${saved.bytes} of ${saved.total} bytes · tap to open"
+                    else "${saved.bytes} bytes · verified · tap to open",
                     file = saved.file
                 )
             )
@@ -164,6 +172,13 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     fun checkForUpdates() = launchUpdateCheck(interactive = true)
 
     fun dismissUpdatePrompt() = _state.update { it.copy(updatePrompt = null) }
+
+    fun toggleBestEffort() {
+        val next = !_state.value.bestEffort
+        prefs.edit().putBoolean(KEY_BEST_EFFORT, next).apply()
+        files.bestEffort = next
+        _state.update { it.copy(bestEffort = next) }
+    }
 
     fun toggleTheme() {
         val next = !_state.value.darkTheme

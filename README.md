@@ -105,9 +105,12 @@ Measured in `tools/tests/test_mfsk.py`: byte-perfect through a 300–7000 Hz
 channel at 12 dB SNR, with 1000 ppm clock drift (ten times worse than any real
 device).
 
-**Not yet implemented: ARQ.** A corrupted chunk is still lost rather than
-resent. That is the next change, and it matters more at 480 B/s than it did at
-120.
+**Best effort (UDP-style)**, off by default, under About → Transfer. The link is
+already fire-and-forget: nothing is ever ACKed or retransmitted, so the switch
+does not make it faster — it changes the outcome on loss. Off, one missing chunk
+discards the whole file. On, whatever arrived is written out as `<name>.partial`
+with the gaps left as zeros, and the bubble reports how many bytes of how many
+landed. It is the honest UDP trade: no waiting, no recovery, partial data.
 
 The app checks for a newer release **once every 24 hours, on open** (the
 timestamp is stored, so relaunching does not re-check). If one exists it shows a

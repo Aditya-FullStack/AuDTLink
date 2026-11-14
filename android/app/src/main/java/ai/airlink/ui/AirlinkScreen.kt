@@ -553,6 +553,42 @@ private fun AboutScreen(state: UiState, vm: LinkViewModel) {
                 }
             }
 
+            SectionCard("Transfer") {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Best effort (UDP-style)",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            if (state.bestEffort)
+                                "On — keep what arrives, drop the rest"
+                            else "Off — a lost chunk fails the whole file",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = state.bestEffort,
+                        onCheckedChange = { vm.toggleBestEffort() }
+                    )
+                }
+                if (state.bestEffort) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Nothing is ever retransmitted — that was already true. " +
+                            "This only changes the outcome: a file with holes is saved " +
+                            "as .partial instead of being discarded.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             SectionCard("Updates") {
                 val upd = state.update
                 Text(

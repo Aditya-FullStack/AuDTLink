@@ -12,7 +12,21 @@ import java.util.zip.CRC32
  */
 class FileAssembler(private val dir: File) {
 
-    data class Saved(val name: String, val file: File, val bytes: Long)
+    /**
+     * UDP-style delivery. When true, a transfer that loses chunks is still
+     * written out — what arrived is kept, the gaps are left as zeros — instead
+     * of being thrown away because the CRC no longer matches. Nothing is
+     * retransmitted either way; this only changes what happens on loss.
+     */
+    var bestEffort: Boolean = false
+
+    data class Saved(
+        val name: String,
+        val file: File,
+        val bytes: Long,
+        val total: Long = 0L,
+        val partial: Boolean = false
+    )
 
     private class Xfer(val txid: Int, val name: String, val size: Int, val crc: Long) {
         val buf = ByteArray(size)
@@ -59,16 +73,25 @@ class FileAssembler(private val dir: File) {
                 val x = active.remove(bb.getInt(0)) ?: return null
                 val want = bb.getInt(4).toLong() and 0xFFFFFFFFL
                 val crc = CRC32().apply { update(x.buf) }.value
-                if (crc != want || x.received < x.size) {
+                val intact = crc == want && x.received == x.size
+
+                if (!intact && !bestEffort) {
                     onFailed?.invoke(
                         "%s: incomplete (%d/%d bytes)".format(x.name, x.received, x.size)
                     )
                     return null
                 }
+
                 dir.mkdirs()
-                val file = uniqueFile(dir, x.name)
+                val file = uniqueFile(dir, if (intact) x.name else x.name + ".partial")
                 file.writeBytes(x.buf)
-                val saved = Saved(file.name, file, x.size.toLong())
+                val saved = Saved(
+                    name = file.name,
+                    file = file,
+                    bytes = if (intact) x.size.toLong() else x.received.toLong(),
+                    total = x.size.toLong(),
+                    partial = !intact
+                )
                 onSaved?.invoke(saved)
                 return saved
             }
