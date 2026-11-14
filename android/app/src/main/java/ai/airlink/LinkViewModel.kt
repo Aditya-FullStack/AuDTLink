@@ -39,7 +39,9 @@ data class ChatItem(
     val kind: String,
     val text: String,
     val detail: String? = null,
-    val at: Long = System.currentTimeMillis()
+    val at: Long = System.currentTimeMillis(),
+    /** Set for received files, so the bubble can hand them to another app. */
+    val file: File? = null
 )
 
 data class UiState(
@@ -95,8 +97,12 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
         files.onSaved = { saved ->
             addItem(
                 ChatItem(
-                    itemIds.getAndIncrement(), Direction.IN, "FILE", saved.name,
-                    "${saved.bytes} bytes · verified CRC32 · saved to Airlink/${saved.name}"
+                    id = itemIds.getAndIncrement(),
+                    direction = Direction.IN,
+                    kind = "FILE",
+                    text = saved.name,
+                    detail = "${saved.bytes} bytes · verified · tap to open",
+                    file = saved.file
                 )
             )
         }
