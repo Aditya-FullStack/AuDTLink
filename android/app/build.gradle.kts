@@ -13,8 +13,8 @@ android {
         minSdk = 24
         targetSdk = 34
         // Bump these together for every release: the label carries the version.
-        versionCode = 7
-        versionName = "4.3"
+        versionCode = 8
+        versionName = "4.4"
     }
 
     // One committed key for every build, so v2 installs straight over v1.
