@@ -34,6 +34,7 @@ jobs:
           python3 -m pip install --quiet numpy
           python3 tools/tests/test_airlink.py
           python3 tools/tests/test_kotlin_port.py
+          python3 tools/tests/test_mfsk.py
           python3 tools/tests/test_minimodem_interop.py
 
       - name: Set up Gradle 8.7

@@ -16,6 +16,8 @@ enum class AudioProfile(
     val spaceHz: Double,
     val audible: Boolean,
     val beta: Boolean,
+    /** True when the mode is app-to-app only and minimodem cannot decode it. */
+    val proprietary: Boolean,
     val chunkBytes: Int,
     val minimodemRxArgs: List<String>
 ) {
@@ -29,28 +31,28 @@ enum class AudioProfile(
         spaceHz = 2200.0,
         audible = true,
         beta = false,
+        proprietary = false,
         chunkBytes = 512,
         minimodemRxArgs = listOf("1200", "-M", "1200", "-S", "2200")
     ),
 
     /**
-     * Twice the speed. Bell 202's 1 kHz tone spacing collapses at 2400 baud,
-     * so the tones move apart to 2.0/4.4 kHz — wider shift, wider bandwidth,
-     * less tolerant of a muffled microphone.
+     * 4-FSK, app to app only. Two bits per symbol at the same 2400 baud the
+     * old 2-FSK mode used, so twice the throughput — and no minimodem
+     * compatibility, because minimodem has no 4-FSK mode to speak of.
      */
     FAST(
         id = "fast",
-        title = "Audible fast",
-        subtitle = "2400 baud · 2000/4400 Hz · ~240 B/s",
+        title = "Fast",
+        subtitle = "4-FSK · 2400 baud · ~480 B/s · app to app",
         baud = 2400.0,
-        markHz = 2000.0,
-        spaceHz = 4400.0,
+        markHz = 1300.0,
+        spaceHz = 5500.0,
         audible = true,
         beta = false,
+        proprietary = true,
         chunkBytes = 512,
-        // -b widens minimodem's receive filter: its 200 Hz default is far
-        // narrower than this mode's 2.4 kHz shift.
-        minimodemRxArgs = listOf("2400", "-M", "2000", "-S", "4400", "-b", "3400")
+        minimodemRxArgs = emptyList()
     ),
 
     /** 18.5/19.5 kHz. Silent to most adults; short range, slower. */
@@ -63,6 +65,7 @@ enum class AudioProfile(
         spaceHz = 19500.0,
         audible = false,
         beta = true,
+        proprietary = false,
         chunkBytes = 96,
         minimodemRxArgs = listOf("300", "-M", "18500", "-S", "19500", "-b", "1400")
     );
@@ -73,15 +76,18 @@ enum class AudioProfile(
     /** Transmit needs no receive filter, so the -b tail is dropped. */
     val minimodemTxArgs: List<String> get() = minimodemRxArgs.take(5)
 
-    fun minimodemRxCommand(): String = "minimodem --rx -q " + minimodemRxArgs.joinToString(" ")
+    fun minimodemRxCommand(): String =
+        if (proprietary) "not minimodem compatible — app to app only"
+        else "minimodem --rx -q " + minimodemRxArgs.joinToString(" ")
 
-    fun minimodemTxCommand(): String = "minimodem --tx -q " + minimodemTxArgs.joinToString(" ")
+    fun minimodemTxCommand(): String =
+        if (proprietary) "install AuDTLink on the other end"
+        else "minimodem --tx -q " + minimodemTxArgs.joinToString(" ")
 
     /** One-line summary of what a decoder on the other end must be told. */
     fun wireSummary(): String =
-        "%s · %.0f baud · mark %.0f Hz · space %.0f Hz · 8N1".format(
-            title, baud, markHz, spaceHz
-        )
+        if (proprietary) "%s · 4-FSK · 1300/2700/4100/5500 Hz · 2400 baud · 2 bits/symbol".format(title)
+        else "%s · %.0f baud · mark %.0f Hz · space %.0f Hz · 8N1".format(title, baud, markHz, spaceHz)
 
     companion object {
         fun fromId(id: String?): AudioProfile = entries.firstOrNull { it.id == id } ?: AUDIBLE

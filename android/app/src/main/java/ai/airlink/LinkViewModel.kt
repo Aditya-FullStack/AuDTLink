@@ -10,6 +10,8 @@ import ai.airlink.audio.AudioEngine
 import ai.airlink.audio.AudioProfile
 import ai.airlink.audio.BfskDemodulator
 import ai.airlink.audio.BfskModulator
+import ai.airlink.audio.Mfsk4Demodulator
+import ai.airlink.audio.Mfsk4Modulator
 import ai.airlink.protocol.FileAssembler
 import ai.airlink.protocol.Frame
 import ai.airlink.protocol.FrameAssembler
@@ -70,6 +72,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
 
     private val engine = AudioEngine()
     private var demod: BfskDemodulator? = null
+    private var demod4: Mfsk4Demodulator? = null
     private var assembler = FrameAssembler()
     private var sendJob: Job? = null
 
@@ -300,14 +303,24 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
             }
             try {
                 engine.withTrack(rate) { track ->
-                    val mod = BfskModulator(profile, rate)
-                    val lead = mod.idle(150)
+                    val render: (ByteArray) -> ShortArray
+                    val idle: (Int) -> ShortArray
+                    if (profile.proprietary) {
+                        val m = Mfsk4Modulator(rate)
+                        render = { m.render(it) }
+                        idle = { m.idle(it) }
+                    } else {
+                        val m = BfskModulator(profile, rate)
+                        render = { m.render(it) }
+                        idle = { m.idle(it) }
+                    }
+                    val lead = idle(150)
                     track.write(lead, 0, lead.size)
 
                     for (index in payloads.indices) {
                         if (!isActive) break
 
-                        val pcm = mod.render(payloads[index])
+                        val pcm = render(payloads[index])
                         var written = 0
                         var announced = false
 
@@ -340,12 +353,20 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
                         }
 
                         if (!isActive) break
+
+                        // 4-FSK frames go out as separate bursts: the gap lets
+                        // the receiver re-acquire its clock on every frame.
+                        if (profile.proprietary && index < payloads.size - 1) {
+                            val gap = ShortArray(rate * 30 / 1000)
+                            track.write(gap, 0, gap.size)
+                        }
+
                         _state.update {
                             it.copy(status = "Transmitting $label ${index + 1}/${payloads.size}…")
                         }
                     }
 
-                    val tail = mod.idle(120)
+                    val tail = idle(120)
                     track.write(tail, 0, tail.size)
                 }
                 _state.update { it.copy(sending = false, paused = false, status = "Sent $label") }
@@ -371,13 +392,14 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
 
         val profile = _state.value.profile
         val rate = engine.pickSampleRate(48000)
-        val d = BfskDemodulator(profile, rate)
-        d.reset()
-        demod = d
+        val d2 = if (profile.proprietary) null else BfskDemodulator(profile, rate).also { it.reset() }
+        val d4 = if (profile.proprietary) Mfsk4Demodulator(rate).also { it.reset() } else null
+        demod = d2
+        demod4 = d4
         assembler = FrameAssembler()
 
         val ok = engine.startCapture(rate) { samples, count ->
-            val bytes = d.feed(samples, count)
+            val bytes = d2?.feed(samples, count) ?: d4!!.feed(samples, count)
             var framesOk = _state.value.framesOk
             var framesBad = _state.value.framesBad
             if (bytes.isNotEmpty()) {
@@ -388,7 +410,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
             }
             _state.update {
                 it.copy(
-                    signal = d.signalLevel,
+                    signal = d2?.signalLevel ?: 0f,
                     bytes = it.bytes + bytes.size,
                     framesOk = framesOk,
                     framesBad = framesBad
@@ -409,6 +431,7 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
         if (!_state.value.receiving) return
         engine.stopCapture()
         demod = null
+        demod4 = null
         _state.update { it.copy(receiving = false, signal = 0f, status = "Ready") }
     }
 

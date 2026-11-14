@@ -66,7 +66,7 @@ Two modes, nothing else to configure:
 | Mode | Tone | Speed | Notes |
 |---|---|---|---|
 | **Audible** | Bell 202, 1200/2200 Hz | ~120 B/s | The tolerant default. Works at a few metres. |
-| **Audible fast** | 2400 baud, 2000/4400 Hz | ~240 B/s | Twice as fast. Bell 202's 1 kHz spacing collapses at 2400 baud, so the tones move apart; needs a decent speaker and a quiet room. |
+| **Fast** | 4-FSK, 2400 baud, 1300/2700/4100/5500 Hz | ~480 B/s | Two bits per symbol — four times the audible default. **App to app only**: minimodem has no 4-FSK mode, so a Linux box cannot decode this one. |
 | **Ultrasound (Beta)** | 18.5/19.5 kHz | ~30 B/s | Silent to most adults. Keep phones ~10 cm apart. |
 
 Sending can be paused with the round button in the composer, which turns into
@@ -86,6 +86,28 @@ A received file shows up as a bubble — tap it and the system chooser opens it 
 whatever app can handle the type, file manager included. The file is handed over
 through a `FileProvider`, so the receiving app gets read access to that one file
 and nothing else in the app's storage.
+
+### The 4-FSK mode
+
+`Fast` is a proprietary modulation, not minimodem compatible: four tones, two
+bits per symbol, gray coded, 2400 baud. Twice the throughput of the old 2-FSK
+mode for the same symbol rate, which is the most a phone speaker and microphone
+will carry — 8-FSK and 3200 baud both fall apart under test.
+
+There are no start/stop bits to re-sync a byte on, so a transmission opens with
+an alternating-symbol preamble that gives the receiver a clock, and timing is
+tracked per block of symbols by searching the sample offset that makes each
+block sharpest. Frames are sent as separate bursts with a 30 ms silence gap, so
+each one re-acquires its own clock — decoding straight through a frame boundary
+makes the timing slip a symbol and loses the next frame entirely.
+
+Measured in `tools/tests/test_mfsk.py`: byte-perfect through a 300–7000 Hz
+channel at 12 dB SNR, with 1000 ppm clock drift (ten times worse than any real
+device).
+
+**Not yet implemented: ARQ.** A corrupted chunk is still lost rather than
+resent. That is the next change, and it matters more at 480 B/s than it did at
+120.
 
 The app checks for a newer release **once every 24 hours, on open** (the
 timestamp is stored, so relaunching does not re-check). If one exists it shows a
