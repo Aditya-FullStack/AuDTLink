@@ -78,6 +78,10 @@ The gear icon opens **About**: version, what the app does, its permissions, and
 an update check that reads the newest GitHub release and offers the APK. That
 check is the only network call the app makes — see the note on `INTERNET` below.
 
+**Dark mode** is a switch under About → Appearance. It applies immediately and
+is remembered across launches (stored in SharedPreferences), and the status bar
+icon colours follow it so nothing becomes unreadable at night.
+
 A received file shows up as a bubble — tap it and the system chooser opens it in
 whatever app can handle the type, file manager included. The file is handed over
 through a `FileProvider`, so the receiving app gets read access to that one file

@@ -62,7 +62,8 @@ data class UiState(
     val update: ReleaseInfo? = null,
     val updateAvailable: Boolean = false,
     val updateError: String? = null,
-    val updatePrompt: ReleaseInfo? = null
+    val updatePrompt: ReleaseInfo? = null,
+    val darkTheme: Boolean = false
 )
 
 class LinkViewModel(app: Application) : AndroidViewModel(app) {
@@ -75,20 +76,23 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     private val inboxDir = File(app.getExternalFilesDir(null) ?: app.filesDir, "Airlink")
     private val files = FileAssembler(inboxDir)
 
-    private val _state = MutableStateFlow(UiState())
+    private val prefs = app.getSharedPreferences("airlink", Context.MODE_PRIVATE)
+
+    private val _state = MutableStateFlow(
+        UiState(darkTheme = prefs.getBoolean(KEY_DARK_THEME, false))
+    )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private companion object {
         /** ~43 ms of audio at 48 kHz — the pause granularity. */
         const val BLOCK_SAMPLES = 2048
         const val KEY_LAST_CHECK = "last_update_check"
+        const val KEY_DARK_THEME = "dark_theme"
         const val DAY_MS = 24L * 60L * 60L * 1000L
     }
 
     private val itemIds = AtomicLong(1)
     private var txCounter = 1
-
-    private val prefs = app.getSharedPreferences("airlink", Context.MODE_PRIVATE)
 
     @Volatile
     private var pauseRequested = false
@@ -157,6 +161,12 @@ class LinkViewModel(app: Application) : AndroidViewModel(app) {
     fun checkForUpdates() = launchUpdateCheck(interactive = true)
 
     fun dismissUpdatePrompt() = _state.update { it.copy(updatePrompt = null) }
+
+    fun toggleTheme() {
+        val next = !_state.value.darkTheme
+        prefs.edit().putBoolean(KEY_DARK_THEME, next).apply()
+        _state.update { it.copy(darkTheme = next) }
+    }
 
     private fun launchUpdateCheck(interactive: Boolean) {
         if (_state.value.updateChecking) return
