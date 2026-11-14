@@ -78,6 +78,11 @@ The gear icon opens **About**: version, what the app does, its permissions, and
 an update check that reads the newest GitHub release and offers the APK. That
 check is the only network call the app makes — see the note on `INTERNET` below.
 
+A received file shows up as a bubble — tap it and the system chooser opens it in
+whatever app can handle the type, file manager included. The file is handed over
+through a `FileProvider`, so the receiving app gets read access to that one file
+and nothing else in the app's storage.
+
 The app checks for a newer release **once every 24 hours, on open** (the
 timestamp is stored, so relaunching does not re-check). If one exists it shows a
 dialog with the version and release notes, and a Download button. A failed
@@ -116,9 +121,9 @@ It rewrites the three places that have to stay in sync:
 
 | File | Field | v2 (current) |
 |---|---|---|
-| `app/build.gradle.kts` | `versionCode` | `7` |
-| `app/build.gradle.kts` | `versionName` | `"4.3"` |
-| `res/values/strings.xml` | `app_name` | `AuDTLink v4.3` |
+| `app/build.gradle.kts` | `versionCode` | `8` |
+| `app/build.gradle.kts` | `versionName` | `"4.4"` |
+| `res/values/strings.xml` | `app_name` | `AuDTLink v4.4` |
 
 The launcher label carries the version, which is the quickest way to tell two
 sideloaded builds apart on the same phone.
