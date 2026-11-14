@@ -104,6 +104,25 @@ shared signing key — the APK that gets published to GitHub Releases is the one
 you install. `./gradlew assembleDebug` still works locally when you want a
 debuggable build with no shrinking.
 
+## Pushing changes
+
+`tools/push_to_github.py` sends **only the files that differ**, as one commit:
+
+```bash
+python3 tools/push_to_github.py --dry-run        # what would go up
+python3 tools/push_to_github.py -m "v4.5: ..."   # push it
+```
+
+It hashes every local file as a git blob and compares that against the remote
+tree, so unchanged files are never re-uploaded and never re-trigger CI. One
+commit means one build.
+
+This matters more than it sounds. Uploading files one at a time through the
+Contents API creates one commit — and one workflow run — *per file*. Pushing
+twelve files that way produced eleven builds of half-updated trees, every one
+of which failed on a missing method or field, plus the single build that had
+the whole change. Batching removes that entire class of failure.
+
 ## Versions and signing
 
 Every build is signed with the same key (`android/keystore/airlink.p12`), so a
