@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Roots that FileProvider may hand out. Received files land in the app-specific
+  external dir ("Airlink/"), with filesDir as the fallback when no external
+  storage is mounted, so both are listed.
+-->
+<paths>
+    <external-files-path name="airlink" path="Airlink/" />
+    <files-path name="airlink_internal" path="Airlink/" />
+</paths>
