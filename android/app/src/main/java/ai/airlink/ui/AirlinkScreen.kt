@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -83,6 +84,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import ai.airlink.BuildConfig
 import ai.airlink.ChatItem
 import ai.airlink.Direction
@@ -91,6 +93,7 @@ import ai.airlink.ReleaseInfo
 import ai.airlink.Screen
 import ai.airlink.UiState
 import ai.airlink.audio.AudioProfile
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -343,6 +346,7 @@ private fun EmptyState(state: UiState) {
 
 @Composable
 private fun Bubble(item: ChatItem) {
+    val context = LocalContext.current
     val outgoing = item.direction == Direction.OUT
     val accent = when (item.kind) {
         "FILE" -> Color(0xFF3B5BDB)
@@ -355,16 +359,18 @@ private fun Bubble(item: ChatItem) {
         Modifier.fillMaxWidth(),
         horizontalArrangement = if (outgoing) Arrangement.End else Arrangement.Start
     ) {
-        Column(
-            Modifier
-                .widthIn(max = 290.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(
-                    if (outgoing) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surface
-                )
-                .padding(horizontal = 12.dp, vertical = 9.dp)
-        ) {
+        val attach = item.file
+        val bubbleModifier = Modifier
+            .widthIn(max = 290.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (outgoing) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surface
+            )
+            .let { base -> if (attach != null) base.clickable { openFile(context, attach) } else base }
+            .padding(horizontal = 12.dp, vertical = 9.dp)
+
+        Column(bubbleModifier) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(item.kind, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = accent)
                 Spacer(Modifier.width(6.dp))
@@ -724,6 +730,32 @@ private fun UpdateDialog(release: ReleaseInfo, onDownload: () -> Unit, onLater: 
             TextButton(onClick = onLater) { Text("Later") }
         }
     )
+}
+
+/**
+ * Hands a received file to whatever app can display it — the system chooser
+ * includes the file manager. The URI comes from FileProvider, so the receiving
+ * app gets read access to that one file and nothing else.
+ */
+private fun openFile(context: Context, file: File) {
+    runCatching {
+        val uri = FileProvider.getUriForFile(
+            context, context.packageName + ".fileprovider", file
+        )
+        val mime = context.contentResolver.getType(uri)
+            ?: MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(file.extension.lowercase(Locale.ROOT))
+            ?: "*/*"
+        val view = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mime)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(
+            Intent.createChooser(view, "Open with").apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }
 }
 
 private fun openUrl(context: Context, url: String) {
